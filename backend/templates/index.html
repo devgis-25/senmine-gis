@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SenMine GIS — Système d'Information Géographique Minier du Sénégal</title>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #D4A843;
+            --gold-light: #F0C855;
+            --gold-dark: #A07830;
+            --copper: #B87333;
+            --dark: #0A0E1A;
+            --dark2: #111827;
+            --dark3: #1C2535;
+            --dark4: #243044;
+            --border: #2D3E55;
+            --text: #E8EDF5;
+            --muted: #6B8BAE;
+            --green: #22C55E;
+            --red: #EF4444;
+            --orange: #F97316;
+            --blue: #3B82F6;
+            --sidebar-w: 320px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--dark2) 0%, #0F1A2E 100%);
+            padding: 0 24px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            z-index: 100;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-light), var(--gold), var(--gold-dark));
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+
+        .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+            box-shadow: 0 0 20px rgba(212,168,67,0.3);
+        }
+
+        .header-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 17px; font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .header-title span { color: var(--gold); }
+        .header-subtitle { font-size: 11px; color: var(--muted); margin-top: 1px; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+
+        .badge {
+            font-size: 10px; font-weight: 600;
+            padding: 3px 10px; border-radius: 20px;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+
+        .badge-usgs { background: rgba(212,168,67,0.15); color: var(--gold); border: 1px solid rgba(212,168,67,0.3); }
+        .badge-live { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); animation: blink 2s infinite; }
+
+        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+        .btn-stats {
+            display: flex; align-items: center; gap: 6px;
+            background: var(--dark3); border: 1px solid var(--border);
+            border-radius: 8px; padding: 6px 14px;
+            color: var(--text); font-size: 12px; font-weight: 500;
+            text-decoration: none; transition: border-color 0.2s;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn-stats:hover { border-color: var(--gold); color: var(--gold); }
+
+        .burger { display: none; background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px; }
+
+        .main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--dark2);
+            display: flex; flex-direction: column;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+            z-index: 50;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        .tabs {
+            display: flex;
+            background: var(--dark);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .tab {
+            flex: 1; padding: 10px 2px;
+            font-size: 9px; font-weight: 700;
+            text-align: center; cursor: pointer;
+            color: var(--muted);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+
+        .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+        .tab:hover { color: var(--text); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+
+        .section-title {
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1.2px;
+            color: var(--gold-dark); margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 3px; height: 12px;
+            background: var(--gold); border-radius: 2px;
+        }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        .stat-card {
+            background: var(--dark3);
+            border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px;
+            position: relative; overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover { border-color: var(--gold-dark); }
+
+        .stat-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+        }
+
+        .stat-card.full { grid-column: 1 / -1; }
+        .stat-label { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px; font-weight: 700; line-height: 1;
+        }
+
+        .stat-value.gold { color: var(--gold); }
+        .stat-value.green { color: var(--green); }
+        .stat-value.orange { color: var(--orange); }
+        .stat-value.blue { color: var(--blue); }
+
+        .stat-icon { position: absolute; right: 12px; top: 12px; font-size: 20px; opacity: 0.3; }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--dark3) 25%, var(--dark4) 50%, var(--dark3) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        .layer-row {
+            display: flex; align-items: center;
+            justify-content: space-between; padding: 8px 0;
+            border-bottom: 1px solid rgba(45,62,85,0.5);
+        }
+
+        .layer-row:last-child { border-bottom: none; }
+        .layer-info { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+
+        .layer-icon {
+            width: 24px; height: 24px;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; flex-shrink: 0;
+        }
+
+        .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .switch-slider {
+            position: absolute; inset: 0;
+            background: var(--border); border-radius: 20px;
+            cursor: pointer; transition: 0.2s;
+        }
+
+        .switch-slider:before {
+            content: ''; position: absolute;
+            width: 14px; height: 14px;
+            background: var(--muted); border-radius: 50%;
+            top: 3px; left: 3px; transition: 0.2s;
+        }
+
+        .switch input:checked + .switch-slider { background: rgba(212,168,67,0.3); }
+        .switch input:checked + .switch-slider:before { transform: translateX(16px); background: var(--gold); }
+
+        .conflit-card {
+            background: var(--dark3); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px;
+            margin-bottom: 8px; cursor: pointer;
+            transition: all 0.2s; border-left: 3px solid var(--border);
+        }
+
+        .conflit-card:hover { background: var(--dark4); transform: translateX(2px); }
+        .conflit-card.critique { border-left-color: var(--red); }
+        .conflit-card.eleve { border-left-color: var(--orange); }
+        .conflit-card.modere { border-left-color: var(--gold); }
+        .conflit-card.faible { border-left-color: var(--green); }
+
+        .conflit-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .conflit-nom { font-size: 12px; font-weight: 600; }
+
+        .risk-badge {
+            font-size: 9px; font-weight: 700;
+            padding: 2px 7px; border-radius: 20px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .risk-critique { background: rgba(239,68,68,0.2); color: var(--red); }
+        .risk-eleve { background: rgba(249,115,22,0.2); color: var(--orange); }
+        .risk-modere { background: rgba(212,168,67,0.2); color: var(--gold); }
+        .risk-faible { background: rgba(34,197,94,0.2); color: var(--green); }
+
+        .conflit-details {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 4px; font-size: 10px; color: var(--muted);
+        }
+
+        .pred-card {
+            background: var(--dark3); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px;
+            margin-bottom: 8px; cursor: pointer; transition: all 0.2s;
+        }
+
+        .pred-card:hover { border-color: var(--gold-dark); }
+        .pred-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .pred-region { font-size: 13px; font-weight: 600; }
+
+        .pred-score {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px; font-weight: 700; color: var(--gold);
+        }
+
+        .pred-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+
+        .pred-bar-fill {
+            height: 100%; border-radius: 2px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+            transition: width 1s ease;
+        }
+
+        .pred-substances { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        .substance-tag {
+            font-size: 9px; font-weight: 600;
+            padding: 2px 6px; border-radius: 4px;
+            background: rgba(212,168,67,0.1);
+            color: var(--gold-dark);
+            border: 1px solid rgba(212,168,67,0.2);
+        }
+
+        .impact-card {
+            background: var(--dark3); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px;
+            margin-bottom: 8px; border-left: 3px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .impact-card:hover { background: var(--dark4); }
+        .impact-card.critique { border-left-color: var(--red); }
+        .impact-card.eleve { border-left-color: var(--orange); }
+        .impact-card.modere { border-left-color: var(--gold); }
+        .impact-card.faible { border-left-color: var(--green); }
+
+        .impact-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .impact-nom { font-size: 12px; font-weight: 600; }
+
+        .impact-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px; margin-bottom: 8px;
+        }
+
+        .impact-stat { background: var(--dark); border-radius: 6px; padding: 6px 8px; text-align: center; }
+
+        .impact-stat-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px; font-weight: 700; color: var(--gold);
+        }
+
+        .impact-stat-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; }
+        .impact-distances { display: flex; gap: 8px; font-size: 10px; color: var(--muted); flex-wrap: wrap; }
+
+        #map { flex: 1; position: relative; min-width: 0; }
+
+        .map-loader {
+            position: absolute; inset: 0;
+            background: var(--dark);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 20; gap: 16px; transition: opacity 0.5s;
+        }
+
+        .map-loader.hidden { opacity: 0; pointer-events: none; }
+
+        .loader-ring {
+            width: 48px; height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loader-text { font-size: 13px; color: var(--muted); }
+        .loader-sub { font-size: 11px; color: var(--border); }
+
+        .legend {
+            position: absolute; bottom: 32px; left: 12px;
+            background: rgba(17,24,39,0.95);
+            border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px 16px;
+            z-index: 10; font-size: 11px;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend-title {
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--gold); margin-bottom: 10px;
+        }
+
+        .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .legend-row:last-child { margin-bottom: 0; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.3); }
+        .legend-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+        .maplibregl-popup-content {
+            background: rgba(17,24,39,0.98) !important;
+            color: var(--text) !important;
+            border-radius: 12px !important;
+            padding: 0 !important;
+            font-family: 'Outfit', sans-serif !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+            min-width: 220px; overflow: hidden;
+        }
+
+        .maplibregl-popup-close-button { color: var(--muted) !important; font-size: 18px !important; padding: 8px 12px !important; z-index: 1; }
+        .maplibregl-popup-tip { border-top-color: var(--border) !important; }
+
+        .popup-header {
+            background: linear-gradient(135deg, var(--dark3), var(--dark4));
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .popup-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+        .popup-type { font-size: 10px; color: var(--muted); }
+        .popup-body { padding: 12px 16px; }
+
+        .popup-row {
+            display: flex; justify-content: space-between;
+            font-size: 11px; margin-bottom: 6px; padding-bottom: 6px;
+            border-bottom: 1px solid rgba(45,62,85,0.5);
+        }
+
+        .popup-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .popup-row-label { color: var(--muted); }
+        .popup-row-value { color: var(--text); font-weight: 500; text-align: right; max-width: 60%; }
+
+        .popup-status {
+            display: inline-block; font-size: 9px; font-weight: 700;
+            padding: 2px 8px; border-radius: 20px;
+            background: rgba(34,197,94,0.2); color: var(--green);
+            text-transform: uppercase;
+        }
+
+        .map-hint {
+            position: absolute; bottom: 32px; right: 12px;
+            background: rgba(17,24,39,0.9);
+            border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 14px;
+            font-size: 11px; color: var(--muted);
+            z-index: 10; pointer-events: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .chart-container { position: relative; height: 180px; margin-top: 8px; }
+
+        @media (max-width: 768px) {
+            :root { --sidebar-w: 290px; }
+            .burger { display: block; }
+            .sidebar { position: absolute; top: 0; left: 0; height: 100%; transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .map-hint { display: none; }
+            .legend { display: none; }
+            .badge { display: none; }
+        }
+
+        @media (max-width: 400px) { :root { --sidebar-w: 100vw; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <button class="burger" onclick="toggleSidebar()">☰</button>
+            <div class="logo">⛏</div>
+        <div>
+            <div class="header-title">Sen<span>Mine</span> GIS</div>
+            <div class="header-subtitle">Système d'Information Géographique Minier — Sénégal</div>
+        </div>
+    </div>
+    <div class="header-right">
+        <a href="/statistiques/" class="btn-stats">📊 Statistiques</a>
+        <span class="badge badge-live">● Live</span>
+        <span class="badge badge-usgs">USGS Data</span>
+    </div>
+</header>
+
+<div class="main">
+    <aside class="sidebar" id="sidebar">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">📊 Stats</div>
+            <div class="tab" onclick="switchTab('couches')">🗺 Couches</div>
+            <div class="tab" onclick="switchTab('conflits')">⚠ Conflits</div>
+            <div class="tab" onclick="switchTab('impact')">🌿 Impact</div>
+            <div class="tab" onclick="switchTab('predictions')">🎯 Potentiel</div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="tab-content active" id="tab-dashboard">
+            <div class="section">
+                <div class="section-title">Vue d'ensemble nationale</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">⛏</div>
+                        <div class="stat-label">Sites d'exploitation</div>
+                        <div class="stat-value gold" id="nb-sites"><div class="skeleton" style="width:40px;height:28px"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔍</div>
+                        <div class="stat-label">Explorations</div>
+                        <div class="stat-value blue" id="nb-explorations"><div class="skeleton" style="width:40px;height:28px"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💎</div>
+                        <div class="stat-label">Gisements</div>
+                        <div class="stat-value orange" id="nb-gisements"><div class="skeleton" style="width:40px;height:28px"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🌿</div>
+                        <div class="stat-label">Aires protégées</div>
+                        <div class="stat-value green" id="nb-aires"><div class="skeleton" style="width:40px;height:28px"></div></div>
+                    </div>
+                    <div class="stat-card full">
+                        <div class="stat-label">Régions minières actives</div>
+                        <div id="regions-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+                            <div class="skeleton" style="width:60px;height:20px;border-radius:10px"></div>
+                            <div class="skeleton" style="width:80px;height:20px;border-radius:10px"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Substances minérales</div>
+                <div class="chart-container"><canvas id="chart-substances"></canvas></div>
+            </div>
+            <div class="section">
+                <div class="section-title">Potentiel par région</div>
+                <div class="chart-container"><canvas id="chart-regions"></canvas></div>
+            </div>
+        </div>
+
+        <!-- COUCHES -->
+        <div class="tab-content" id="tab-couches">
+            <div class="section">
+                <div class="section-title">Sites miniers</div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(212,168,67,0.2)">⛏</div>Sites d'exploitation</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('sites-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(59,130,246,0.2)">🔍</div>Explorations</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('explorations-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(249,115,22,0.2)">💎</div>Gisements</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('gisements-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Environnement</div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(34,197,94,0.2)">🌿</div>Aires protégées</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('aires-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(59,130,246,0.2)">🌊</div>Cours d'eau</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('eau-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(107,139,174,0.2)">🏘</div>Localités</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('localites-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(59,130,246,0.15)">👥</div>Zones population</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('population-buffers-fill',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Infrastructure</div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(107,139,174,0.2)">🛣</div>Routes</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('routes-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(249,115,22,0.2)">⚡</div>Lignes électriques</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('lignes-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(59,130,246,0.2)">⚓</div>Ports</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('ports-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+                <div class="layer-row">
+                    <div class="layer-info"><div class="layer-icon" style="background:rgba(212,168,67,0.2)">🗺</div>Régions</div>
+                    <label class="switch"><input type="checkbox" checked onchange="toggleLayer('regions-layer',this.checked)"><span class="switch-slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONFLITS -->
+        <div class="tab-content" id="tab-conflits">
+            <div class="section">
+                <div class="section-title">Analyse des conflits d'usage</div>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Score basé sur la proximité aux aires protégées, cours d'eau et densité de population.</p>
+                <div id="conflits-liste">
+                    <div class="skeleton" style="height:90px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:90px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:90px;border-radius:10px"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IMPACT -->
+        <div class="tab-content" id="tab-impact">
+            <div class="section">
+                <div class="section-title">Impact environnemental</div>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Population dans les rayons 5km, 10km et 20km — WorldPop 2020.</p>
+                <div id="impact-liste">
+                    <div class="skeleton" style="height:120px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:120px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:120px;border-radius:10px"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PREDICTIONS -->
+        <div class="tab-content" id="tab-predictions">
+            <div class="section">
+                <div class="section-title">Potentiel minier par région</div>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">Score calculé à partir des gisements connus, explorations et sites existants.</p>
+                <div id="predictions-liste">
+                    <div class="skeleton" style="height:100px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:100px;margin-bottom:8px;border-radius:10px"></div>
+                    <div class="skeleton" style="height:100px;border-radius:10px"></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div id="map">
+        <div class="map-loader" id="map-loader">
+            <div class="loader-ring"></div>
+            <div class="loader-text">Chargement des données minières…</div>
+            <div class="loader-sub">USGS Africa GIS Database</div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-title">⛏ Légende</div>
+            <div class="legend-row"><div class="legend-dot" style="background:#D4A843"></div><span>Sites d'exploitation</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#3B82F6"></div><span>Sites d'exploration</span></div>
+            <div class="legend-row"><div class="legend-dot" style="background:#F97316"></div><span>Gisements</span></div>
+            <div class="legend-row"><div class="legend-line" style="background:#22C55E;opacity:0.7"></div><span>Aires protégées</span></div>
+            <div class="legend-row"><div class="legend-line" style="background:#60A5FA"></div><span>Cours d'eau</span></div>
+            <div class="legend-row"><div class="legend-line" style="background:#F97316;opacity:0.7"></div><span>Lignes électriques</span></div>
+            <div class="legend-row"><div style="width:20px;height:10px;background:rgba(239,68,68,0.2);border-radius:2px;flex-shrink:0"></div><span>Zone population</span></div>
+        </div>
+
+        <div class="map-hint">💡 Cliquez sur un site pour voir les détails</div>
+    </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000/api';
+let chartSubstances = null;
+let chartRegions = null;
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+}
+
+document.getElementById('map').addEventListener('click', () => {
+    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+});
+
+function switchTab(name) {
+    const names = ['dashboard', 'couches', 'conflits', 'impact', 'predictions'];
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', names[i] === name));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── CARTE ────────────────────────────────────────────────────
+const map = new maplibregl.Map({
+    container: 'map',
+    style: {
+        version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        sources: {
+            'carto-dark': {
+                type: 'raster',
+                tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'],
+                tileSize: 256,
+                attribution: '© CartoDB © OpenStreetMap contributors'
+            }
+        },
+        layers: [{ id: 'carto-dark', type: 'raster', source: 'carto-dark', paint: { 'raster-opacity': 1 } }]
+    },
+    center: [-14.4, 14.4],
+    zoom: 6
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+function toGeoJSON(data) {
+    if (data && data.type === 'FeatureCollection') return data;
+    if (data && data.results) return data.results;
+    return data;
+}
+
+// ── ANIMATION HALOS ──────────────────────────────────────────
+function animerHalos() {
+    let start = null;
+    function frame(ts) {
+        if (!start) start = ts;
+        const prog = ((ts - start) % 2000) / 2000;
+        const opacity = Math.sin(prog * Math.PI) * 0.5;
+
+        if (map.getLayer('sites-pulse')) {
+            map.setPaintProperty('sites-pulse', 'circle-stroke-opacity', opacity);
+            map.setPaintProperty('sites-pulse', 'circle-radius', 20 + prog * 20);
+        }
+        if (map.getLayer('explorations-pulse')) {
+            map.setPaintProperty('explorations-pulse', 'circle-stroke-opacity', opacity * 0.8);
+            map.setPaintProperty('explorations-pulse', 'circle-radius', 16 + prog * 16);
+        }
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+}
+
+// ── COUCHES POPULATION ───────────────────────────────────────
+function ajouterCouchePopulation(impacts) {
+    if (!impacts || !impacts.length) return;
+
+    const features = [];
+    impacts.forEach(item => {
+        if (item.lon == null || item.lat == null) return;
+        [
+            { rayon: 20, pop: item.population_20km },
+            { rayon: 10, pop: item.population_10km },
+            { rayon: 5, pop: item.population_5km },
+        ].forEach(({ rayon, pop }) => {
+            const cercle = turf.circle([item.lon, item.lat], rayon, { units: 'kilometers', steps: 32 });
+            cercle.properties = { site_nom: item.site_nom, rayon_km: rayon, population: pop };
+            features.push(cercle);
+        });
+    });
+
+    const geo = { type: 'FeatureCollection', features };
+
+    if (map.getSource('population-buffers')) {
+        map.getSource('population-buffers').setData(geo);
+    } else {
+        map.addSource('population-buffers', { type: 'geojson', data: geo });
+        map.addLayer({
+            id: 'population-buffers-fill',
+            type: 'fill',
+            source: 'population-buffers',
+            paint: {
+                'fill-color': [
+                    'interpolate', ['linear'], ['get', 'population'],
+                    0,     'rgba(59,130,246,0.04)',
+                    5000,  'rgba(59,130,246,0.10)',
+                    20000, 'rgba(249,115,22,0.14)',
+                    50000, 'rgba(239,68,68,0.20)'
+                ],
+                'fill-opacity': 1
+            }
+        }, 'gisements-halo');
+
+        map.addLayer({
+            id: 'population-buffers-line',
+            type: 'line',
+            source: 'population-buffers',
+            paint: { 'line-color': '#6B8BAE', 'line-width': 0.4, 'line-opacity': 0.25 }
+        }, 'gisements-halo');
+
+        // Popup sur les zones population
+        map.on('click', 'population-buffers-fill', (e) => {
+            const p = e.features[0].properties;
+            if (!p.site_nom) return;
+            new maplibregl.Popup({ offset: 8 })
+                .setLngLat(e.lngLat)
+                .setHTML(`
+                    <div class="popup-header">
+                        <div class="popup-title">👥 Zone d'impact — ${p.site_nom}</div>
+                        <div class="popup-type">Rayon ${p.rayon_km} km</div>
+                    </div>
+                    <div class="popup-body">
+                        <div class="popup-row">
+                            <span class="popup-row-label">Population estimée</span>
+                            <span class="popup-row-value" style="color:var(--gold);font-weight:700">${p.population.toLocaleString('fr')}</span>
+                        </div>
+                    </div>
+                `)
+                .addTo(map);
+        });
+    }
+}
+
+// ── COLORIER RÉGIONS ─────────────────────────────────────────
+function colorierRegionsParPotentiel(predictions) {
+    if (!predictions || !map.getSource('regions')) return;
+    const geo = map.getSource('regions')._data;
+    if (!geo || !geo.features) return;
+
+    geo.features.forEach(f => {
+        const match = predictions.find(p => p.region === f.properties.name);
+        f.properties.score_potentiel = match ? match.score_potentiel : 0;
+    });
+    map.getSource('regions').setData(geo);
+
+    if (!map.getLayer('regions-potentiel')) {
+        map.addLayer({
+            id: 'regions-potentiel', type: 'fill', source: 'regions',
+            paint: {
+                'fill-color': [
+                    'interpolate', ['linear'], ['get', 'score_potentiel'],
+                    0,  'rgba(10,14,26,0)',
+                    20, 'rgba(212,168,67,0.05)',
+                    50, 'rgba(212,168,67,0.15)',
+                    80, 'rgba(212,168,67,0.28)'
+                ],
+                'fill-opacity': 1
+            }
+        }, 'regions-layer');
+    }
+}
+
+// ── STATS ────────────────────────────────────────────────────
+async function chargerStats() {
+    try {
+        const [stats, conflits, predictions, impacts] = await Promise.all([
+            fetch(`${API}/stats/`).then(r => r.json()),
+            fetch(`${API}/conflits-usage/`).then(r => r.json()),
+            fetch(`${API}/predictions/`).then(r => r.json()),
+            fetch(`${API}/impact-environnemental/`).then(r => r.json()),
+        ]);
+
+        document.getElementById('nb-sites').textContent = stats.nb_sites_miniers;
+        document.getElementById('nb-explorations').textContent = stats.nb_explorations;
+        document.getElementById('nb-gisements').textContent = stats.nb_gisements;
+        document.getElementById('nb-aires').textContent = stats.nb_aires_protegees;
+
+        document.getElementById('regions-tags').innerHTML = stats.regions_minieres.map(r =>
+            `<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;
+                background:rgba(212,168,67,0.15);color:var(--gold);
+                border:1px solid rgba(212,168,67,0.3)">${r}</span>`
+        ).join('');
+
+        // Graphique substances
+        const substancesTop = stats.substances_principales.slice(0, 8);
+        const ctxS = document.getElementById('chart-substances').getContext('2d');
+        if (chartSubstances) chartSubstances.destroy();
+        chartSubstances = new Chart(ctxS, {
+            type: 'doughnut',
+            data: {
+                labels: substancesTop,
+                datasets: [{
+                    data: substancesTop.map(() => 1),
+                    backgroundColor: ['#D4A843','#B87333','#A07830','#F0C855','#3B82F6','#F97316','#22C55E','#8B5CF6'],
+                    borderWidth: 0, hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { color: '#6B8BAE', font: { size: 9 }, boxWidth: 10, padding: 8 } } }
+            }
+        });
+
+        // Graphique régions
+        const predsTop = predictions.filter(p => p.score_potentiel > 0).slice(0, 6);
+        const ctxR = document.getElementById('chart-regions').getContext('2d');
+        if (chartRegions) chartRegions.destroy();
+        chartRegions = new Chart(ctxR, {
+            type: 'bar',
+            data: {
+                labels: predsTop.map(p => p.region.replace('Région de ', '')),
+                datasets: [{
+                    data: predsTop.map(p => p.score_potentiel),
+                    backgroundColor: 'rgba(212,168,67,0.3)',
+                    borderColor: '#D4A843', borderWidth: 2, borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' } },
+                    y: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' }, max: 100 }
+                }
+            }
+        });
+
+        afficherConflits(conflits);
+        afficherImpact(impacts);
+        afficherPredictions(predictions);
+        ajouterCouchePopulation(impacts);
+        colorierRegionsParPotentiel(predictions);
+
+    } catch (e) { console.error('Erreur stats:', e); }
+}
+
+// ── AFFICHAGE SIDEBAR ────────────────────────────────────────
+function afficherConflits(data) {
+    const c = document.getElementById('conflits-liste');
+    c.innerHTML = data.map(item => {
+        const cls = item.niveau_risque === 'CRITIQUE' ? 'critique' : item.niveau_risque === 'ÉLEVÉ' ? 'eleve' : item.niveau_risque === 'MODÉRÉ' ? 'modere' : 'faible';
+        const riskCls = 'risk-' + cls;
+        return `
+            <div class="conflit-card ${cls}">
+                <div class="conflit-header">
+                    <div class="conflit-nom">${item.site_nom}</div>
+                    <span class="risk-badge ${riskCls}">${item.niveau_risque}</span>
+                </div>
+                <div class="conflit-details">
+                    <span>⛏ ${item.substance || 'N/A'}</span>
+                    <span>📍 ${item.region}</span>
+                    <span>🌊 ${(item.distance_cours_eau_m/1000).toFixed(1)}km</span>
+                    <span>🌿 ${(item.distance_aire_protegee_m/1000).toFixed(1)}km</span>
+                    <span>🏘 ${item.nb_localites_5km} localités</span>
+                    <span>⚡ ${item.score_conflit}/100</span>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function afficherImpact(data) {
+    const c = document.getElementById('impact-liste');
+    c.innerHTML = data.map(item => {
+        const cls = item.niveau_risque === 'CRITIQUE' ? 'critique' : item.niveau_risque === 'ÉLEVÉ' ? 'eleve' : item.niveau_risque === 'MODÉRÉ' ? 'modere' : 'faible';
+        const riskCls = 'risk-' + cls;
+        const fmtPop = n => n >= 1000 ? (n/1000).toFixed(1)+'k' : n.toString();
+        return `
+            <div class="impact-card ${cls}">
+                <div class="impact-header">
+                    <div class="impact-nom">${item.site_nom}</div>
+                    <span class="risk-badge ${riskCls}">${item.niveau_risque}</span>
+                </div>
+                <div class="impact-grid">
+                    <div class="impact-stat"><div class="impact-stat-val">${fmtPop(item.population_5km)}</div><div class="impact-stat-lbl">Pop. 5km</div></div>
+                    <div class="impact-stat"><div class="impact-stat-val">${fmtPop(item.population_10km)}</div><div class="impact-stat-lbl">Pop. 10km</div></div>
+                    <div class="impact-stat"><div class="impact-stat-val">${fmtPop(item.population_20km)}</div><div class="impact-stat-lbl">Pop. 20km</div></div>
+                </div>
+                <div class="impact-distances">
+                    <span>🌊 ${item.distance_cours_eau_km}km d'eau</span>
+                    <span>🌿 ${item.distance_aire_protegee_km}km aire</span>
+                </div>
+                <div style="margin-top:8px">
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px">
+                        <span>Indice de risque</span>
+                        <span style="color:var(--gold);font-weight:600">${item.indice_risque}/100</span>
+                    </div>
+                    <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+                        <div style="height:100%;width:${item.indice_risque}%;background:linear-gradient(90deg,var(--gold-dark),var(--gold));border-radius:2px"></div>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function afficherPredictions(data) {
+    const c = document.getElementById('predictions-liste');
+    c.innerHTML = data.filter(p => p.score_potentiel > 0).map(p => `
+        <div class="pred-card">
+            <div class="pred-header">
+                <div class="pred-region">${p.region.replace('Région de ', '')}</div>
+                <div class="pred-score">${p.score_potentiel}<span style="font-size:12px;color:var(--muted)">/100</span></div>
+            </div>
+            <div class="pred-bar"><div class="pred-bar-fill" style="width:${p.score_potentiel}%"></div></div>
+            <div class="pred-substances">
+                ${p.substances_probables.slice(0, 3).map(s => `<span class="substance-tag">${s}</span>`).join('')}
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:8px;font-style:italic">${p.recommandation}</div>
+        </div>`
+    ).join('');
+}
+
+// ── COUCHES CARTE ────────────────────────────────────────────
+async function chargerCouches() {
+    const [sites, explorations, gisements, regions, eau, aires, localites, routes, lignes, ports] = await Promise.all([
+        fetch(`${API}/sites-miniers/?page_size=100`).then(r => r.json()),
+        fetch(`${API}/explorations/?page_size=100`).then(r => r.json()),
+        fetch(`${API}/gisements/?page_size=100`).then(r => r.json()),
+        fetch(`${API}/regions/?page_size=100`).then(r => r.json()),
+        fetch(`${API}/cours-eau/?page_size=2000`).then(r => r.json()),
+        fetch(`${API}/aires-protegees/?page_size=100`).then(r => r.json()),
+        fetch(`${API}/localites/?page_size=500`).then(r => r.json()),
+        fetch(`${API}/routes/?page_size=500`).then(r => r.json()),
+        fetch(`${API}/lignes-electriques/?page_size=200`).then(r => r.json()),
+        fetch(`${API}/ports/?page_size=50`).then(r => r.json()),
+    ]);
+
+    const geo = {
+        sites: toGeoJSON(sites), explorations: toGeoJSON(explorations),
+        gisements: toGeoJSON(gisements), regions: toGeoJSON(regions),
+        eau: toGeoJSON(eau), aires: toGeoJSON(aires),
+        localites: toGeoJSON(localites), routes: toGeoJSON(routes),
+        lignes: toGeoJSON(lignes), ports: toGeoJSON(ports),
+    };
+
+    map.addSource('regions', { type: 'geojson', data: geo.regions });
+    map.addLayer({ id: 'regions-layer', type: 'line', source: 'regions', paint: { 'line-color': '#D4A843', 'line-width': 1, 'line-opacity': 0.4, 'line-dasharray': [4, 3] } });
+
+    map.addSource('aires', { type: 'geojson', data: geo.aires });
+    map.addLayer({ id: 'aires-fill', type: 'fill', source: 'aires', paint: { 'fill-color': '#22C55E', 'fill-opacity': 0.08 } });
+    map.addLayer({ id: 'aires-layer', type: 'line', source: 'aires', paint: { 'line-color': '#22C55E', 'line-width': 1.5, 'line-opacity': 0.6 } });
+
+    map.addSource('eau', { type: 'geojson', data: geo.eau });
+    map.addLayer({ id: 'eau-layer', type: 'line', source: 'eau', paint: { 'line-color': '#60A5FA', 'line-width': 1, 'line-opacity': 0.6 } });
+
+    map.addSource('routes', { type: 'geojson', data: geo.routes });
+    map.addLayer({ id: 'routes-layer', type: 'line', source: 'routes', paint: { 'line-color': '#6B8BAE', 'line-width': 1, 'line-opacity': 0.35 } });
+
+    map.addSource('lignes', { type: 'geojson', data: geo.lignes });
+    map.addLayer({ id: 'lignes-layer', type: 'line', source: 'lignes', paint: { 'line-color': '#F97316', 'line-width': 1, 'line-opacity': 0.5, 'line-dasharray': [6, 3] } });
+
+    map.addSource('localites', { type: 'geojson', data: geo.localites });
+    map.addLayer({ id: 'localites-layer', type: 'circle', source: 'localites', paint: { 'circle-radius': 2.5, 'circle-color': '#6B8BAE', 'circle-opacity': 0.5 } });
+
+    map.addSource('ports', { type: 'geojson', data: geo.ports });
+    map.addLayer({ id: 'ports-layer', type: 'circle', source: 'ports', paint: { 'circle-radius': 8, 'circle-color': '#3B82F6', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+
+    map.addSource('gisements', { type: 'geojson', data: geo.gisements });
+    map.addLayer({ id: 'gisements-halo', type: 'circle', source: 'gisements', paint: { 'circle-radius': 18, 'circle-color': '#F97316', 'circle-opacity': 0.1 } });
+    map.addLayer({ id: 'gisements-layer', type: 'circle', source: 'gisements', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 6, 12, 10], 'circle-color': '#F97316', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff', 'circle-opacity': 0.9 } });
+
+    map.addSource('explorations', { type: 'geojson', data: geo.explorations });
+    map.addLayer({ id: 'explorations-halo', type: 'circle', source: 'explorations', paint: { 'circle-radius': 16, 'circle-color': '#3B82F6', 'circle-opacity': 0.1 } });
+    map.addLayer({ id: 'explorations-layer', type: 'circle', source: 'explorations', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 6, 12, 10], 'circle-color': '#3B82F6', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+
+    map.addSource('sites', { type: 'geojson', data: geo.sites });
+    map.addLayer({ id: 'sites-halo', type: 'circle', source: 'sites', paint: { 'circle-radius': 20, 'circle-color': '#D4A843', 'circle-opacity': 0.15 } });
+    map.addLayer({ id: 'sites-layer', type: 'circle', source: 'sites', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 7, 12, 12], 'circle-color': '#D4A843', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+
+    map.addLayer({ id: 'sites-labels', type: 'symbol', source: 'sites', layout: { 'text-field': ['get', 'featurenam'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-offset': [0, 1.5], 'text-anchor': 'top', 'text-max-width': 10 }, paint: { 'text-color': '#F0C855', 'text-halo-color': '#0A0E1A', 'text-halo-width': 2 }, minzoom: 7 });
+    map.addLayer({ id: 'explorations-labels', type: 'symbol', source: 'explorations', layout: { 'text-field': ['get', 'featurenam'], 'text-font': ['Open Sans Bold'], 'text-size': 10, 'text-offset': [0, 1.5], 'text-anchor': 'top' }, paint: { 'text-color': '#93C5FD', 'text-halo-color': '#0A0E1A', 'text-halo-width': 2 }, minzoom: 8 });
+
+    map.addLayer({ id: 'sites-pulse', type: 'circle', source: 'sites', paint: { 'circle-radius': 20, 'circle-color': '#D4A843', 'circle-opacity': 0, 'circle-stroke-width': 2, 'circle-stroke-color': '#D4A843', 'circle-stroke-opacity': 0.4 } });
+    map.addLayer({ id: 'explorations-pulse', type: 'circle', source: 'explorations', paint: { 'circle-radius': 16, 'circle-color': '#3B82F6', 'circle-opacity': 0, 'circle-stroke-width': 2, 'circle-stroke-color': '#3B82F6', 'circle-stroke-opacity': 0.4 } });
+
+    // Popups
+    const addPopup = (layerId, type, titre) => {
+        map.on('click', layerId, (e) => {
+            const p = e.features[0].properties;
+            let rows = '';
+            if (type === 'sites') rows = `
+                <div class="popup-row"><span class="popup-row-label">Type</span><span class="popup-row-value">${p.featuretyp||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Substance</span><span class="popup-row-value">${p.substance||p.categorie||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Opérateur</span><span class="popup-row-value">${p.operatenam||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Région</span><span class="popup-row-value">${p.adm1||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Statut</span><span class="popup-row-value"><span class="popup-status">${p.locopstat||'N/A'}</span></span></div>`;
+            else if (type === 'explorations') rows = `
+                <div class="popup-row"><span class="popup-row-label">Substance</span><span class="popup-row-value">${p.substance||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Propriétaire</span><span class="popup-row-value">${p.ownername||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Région</span><span class="popup-row-value">${p.adm1||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Statut</span><span class="popup-row-value"><span class="popup-status">${p.locopstat||'N/A'}</span></span></div>`;
+            else if (type === 'gisements') rows = `
+                <div class="popup-row"><span class="popup-row-label">Substance principale</span><span class="popup-row-value">${p.substance_principale||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Substance secondaire</span><span class="popup-row-value">${p.substance_secondaire||'N/A'}</span></div>
+                <div class="popup-row"><span class="popup-row-label">Région</span><span class="popup-row-value">${p.adm1||'N/A'}</span></div>`;
+            else rows = `<div class="popup-row"><span class="popup-row-label">Localisation</span><span class="popup-row-value">${p.adm1||'N/A'}</span></div>`;
+
+            new maplibregl.Popup({ offset: 15, maxWidth: '280px' })
+                .setLngLat(e.lngLat)
+                .setHTML(`<div class="popup-header"><div class="popup-title">${titre} — ${p.featurenam||p.name||'Sans nom'}</div><div class="popup-type">Source : USGS Africa GIS Database</div></div><div class="popup-body">${rows}</div>`)
+                .addTo(map);
+        });
+        map.on('mouseenter', layerId, () => map.getCanvas().style.cursor = 'pointer');
+        map.on('mouseleave', layerId, () => map.getCanvas().style.cursor = '');
+    };
+
+    addPopup('sites-layer', 'sites', '⛏ Site d\'exploitation');
+    addPopup('explorations-layer', 'explorations', '🔍 Site d\'exploration');
+    addPopup('gisements-layer', 'gisements', '💎 Gisement minéral');
+    addPopup('ports-layer', 'ports', '⚓ Port');
+
+    document.getElementById('map-loader').classList.add('hidden');
+}
+
+// ── TOGGLE ───────────────────────────────────────────────────
+function toggleLayer(id, visible) {
+    const v = visible ? 'visible' : 'none';
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v);
+    const linked = {
+        'sites-layer': ['sites-halo', 'sites-pulse', 'sites-labels'],
+        'explorations-layer': ['explorations-halo', 'explorations-pulse', 'explorations-labels'],
+        'gisements-layer': ['gisements-halo'],
+        'aires-layer': ['aires-fill'],
+        'population-buffers-fill': ['population-buffers-line'],
+    };
+    if (linked[id]) linked[id].forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', v); });
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+map.on('load', async () => {
+    await chargerCouches();
+    await chargerStats();
+    animerHalos();
+});
+</script>
+</body>
+</html>

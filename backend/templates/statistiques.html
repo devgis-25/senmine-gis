@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SenMine GIS — Statistiques & Analyse</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #D4A843;
+            --gold-light: #F0C855;
+            --gold-dark: #A07830;
+            --copper: #B87333;
+            --dark: #0A0E1A;
+            --dark2: #111827;
+            --dark3: #1C2535;
+            --dark4: #243044;
+            --border: #2D3E55;
+            --text: #E8EDF5;
+            --muted: #6B8BAE;
+            --green: #22C55E;
+            --red: #EF4444;
+            --orange: #F97316;
+            --blue: #3B82F6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* HEADER */
+        header {
+            background: linear-gradient(135deg, var(--dark2), #0F1A2E);
+            padding: 0 32px;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-light), var(--gold), var(--gold-dark));
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+
+        .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 20px rgba(212,168,67,0.3);
+        }
+
+        .header-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 17px; font-weight: 700;
+        }
+
+        .header-title span { color: var(--gold); }
+
+        .btn-back {
+            display: flex; align-items: center; gap: 6px;
+            background: var(--dark3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: var(--text);
+            font-size: 13px; font-weight: 500;
+            cursor: pointer; text-decoration: none;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-back:hover { border-color: var(--gold); color: var(--gold); }
+
+        /* MAIN */
+        .main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+
+        /* PAGE TITLE */
+        .page-title {
+            margin-bottom: 32px;
+        }
+
+        .page-title h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px; font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .page-title h1 span { color: var(--gold); }
+
+        .page-title p {
+            font-size: 14px; color: var(--muted);
+        }
+
+        .page-title .meta {
+            display: flex; gap: 16px; margin-top: 12px;
+        }
+
+        .meta-item {
+            font-size: 11px; color: var(--muted);
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        /* KPIS */
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px; margin-bottom: 32px;
+        }
+
+        .kpi {
+            background: var(--dark2);
+            border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px;
+            position: relative; overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .kpi:hover { border-color: var(--gold-dark); }
+
+        .kpi::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+        }
+
+        .kpi-icon {
+            font-size: 28px; margin-bottom: 12px;
+            display: block;
+        }
+
+        .kpi-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 36px; font-weight: 700;
+            line-height: 1; margin-bottom: 6px;
+        }
+
+        .kpi-value.gold { color: var(--gold); }
+        .kpi-value.blue { color: var(--blue); }
+        .kpi-value.green { color: var(--green); }
+        .kpi-value.orange { color: var(--orange); }
+        .kpi-value.red { color: var(--red); }
+
+        .kpi-label { font-size: 13px; color: var(--muted); }
+        .kpi-sub { font-size: 11px; color: var(--border); margin-top: 4px; }
+
+        /* GRID SECTIONS */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px; margin-bottom: 24px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px; margin-bottom: 24px;
+        }
+
+        .grid-1 { margin-bottom: 24px; }
+
+        @media (max-width: 1024px) { .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .kpis { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 480px) { .kpis { grid-template-columns: 1fr; } .main { padding: 16px; } }
+
+        /* CARDS */
+        .card {
+            background: var(--dark2);
+            border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px;
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px; font-weight: 600;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px;
+            color: var(--text);
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px; height: 16px;
+            background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+            border-radius: 2px;
+        }
+
+        .chart-container { position: relative; height: 250px; }
+        .chart-container.tall { height: 320px; }
+
+        /* TABLE */
+        .table-container { overflow-x: auto; }
+
+        table {
+            width: 100%; border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        thead tr {
+            background: var(--dark3);
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--gold);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid rgba(45,62,85,0.5);
+            transition: background 0.15s;
+        }
+
+        tbody tr:hover { background: var(--dark3); }
+        tbody tr:last-child { border-bottom: none; }
+
+        td { padding: 10px 14px; color: var(--text); }
+
+        .td-muted { color: var(--muted); }
+
+        .risk-pill {
+            display: inline-block;
+            font-size: 9px; font-weight: 700;
+            padding: 2px 8px; border-radius: 20px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .pill-critique { background: rgba(239,68,68,0.2); color: var(--red); }
+        .pill-eleve { background: rgba(249,115,22,0.2); color: var(--orange); }
+        .pill-modere { background: rgba(212,168,67,0.2); color: var(--gold); }
+        .pill-faible { background: rgba(34,197,94,0.2); color: var(--green); }
+
+        /* SCORE BAR */
+        .score-bar {
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .score-bar-track {
+            flex: 1; height: 6px;
+            background: var(--border); border-radius: 3px; overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%; border-radius: 3px;
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+        }
+
+        .score-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px; font-weight: 700;
+            color: var(--gold); min-width: 30px;
+            text-align: right;
+        }
+
+        /* SUBSTANCE TAGS */
+        .substance-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        .substance-tag {
+            font-size: 10px; font-weight: 600;
+            padding: 3px 10px; border-radius: 20px;
+            background: rgba(212,168,67,0.1);
+            color: var(--gold-dark);
+            border: 1px solid rgba(212,168,67,0.25);
+        }
+
+        /* INSIGHT CARDS */
+        .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+        .insight {
+            background: var(--dark3);
+            border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px;
+            border-left: 4px solid var(--gold);
+        }
+
+        .insight.red { border-left-color: var(--red); }
+        .insight.green { border-left-color: var(--green); }
+        .insight.blue { border-left-color: var(--blue); }
+        .insight.orange { border-left-color: var(--orange); }
+
+        .insight-title {
+            font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--gold); margin-bottom: 8px;
+        }
+
+        .insight.red .insight-title { color: var(--red); }
+        .insight.green .insight-title { color: var(--green); }
+        .insight.blue .insight-title { color: var(--blue); }
+        .insight.orange .insight-title { color: var(--orange); }
+
+        .insight-text { font-size: 13px; line-height: 1.6; color: var(--muted); }
+        .insight-text strong { color: var(--text); }
+
+        /* SKELETON */
+        .skeleton {
+            background: linear-gradient(90deg, var(--dark3) 25%, var(--dark4) 50%, var(--dark3) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 32px;
+            color: var(--muted);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            margin-top: 32px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">⛏</div>
+        <div>
+            <div class="header-title">Sen<span>Mine</span> GIS — Statistiques & Analyse</div>
+        </div>
+    </div>
+    <a href="/" class="btn-back">← Retour à la carte</a>
+</header>
+
+<div class="main">
+
+    <div class="page-title">
+        <h1>Rapport d'Analyse du <span>Secteur Minier</span> Sénégalais</h1>
+        <p>Analyse géospatiale complète basée sur les données USGS Africa GIS Database, OpenStreetMap et WorldPop 2020</p>
+        <div class="meta">
+            <div class="meta-item">📅 <span id="date-rapport"></span></div>
+            <div class="meta-item">🗄 Source : USGS National Minerals Information Center</div>
+            <div class="meta-item">🌍 Projection : EPSG:32628 UTM Zone 28N</div>
+        </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpis" id="kpis">
+        <div class="kpi"><span class="kpi-icon">⛏</span><div class="kpi-value gold skeleton" style="height:40px;width:60px"></div><div class="kpi-label">Sites d'exploitation</div></div>
+        <div class="kpi"><span class="kpi-icon">🔍</span><div class="kpi-value blue skeleton" style="height:40px;width:60px"></div><div class="kpi-label">Sites d'exploration</div></div>
+        <div class="kpi"><span class="kpi-icon">💎</span><div class="kpi-value orange skeleton" style="height:40px;width:60px"></div><div class="kpi-label">Gisements identifiés</div></div>
+        <div class="kpi"><span class="kpi-icon">🌿</span><div class="kpi-value green skeleton" style="height:40px;width:60px"></div><div class="kpi-label">Aires protégées</div></div>
+        <div class="kpi"><span class="kpi-icon">🏘</span><div class="kpi-value blue skeleton" style="height:40px;width:60px"></div><div class="kpi-label">Localités cartographiées</div></div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="insights" id="insights">
+        <div class="insight skeleton" style="height:80px"></div>
+        <div class="insight skeleton" style="height:80px"></div>
+        <div class="insight skeleton" style="height:80px"></div>
+        <div class="insight skeleton" style="height:80px"></div>
+    </div>
+
+    <!-- GRAPHIQUES LIGNE 1 -->
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-title">Substances minérales exploitées</div>
+            <div class="chart-container">
+                <canvas id="chart-substances-bar"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Potentiel minier par région (score /100)</div>
+            <div class="chart-container">
+                <canvas id="chart-potentiel"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRAPHIQUES LIGNE 2 -->
+    <div class="grid-3">
+        <div class="card">
+            <div class="card-title">Répartition par type de site</div>
+            <div class="chart-container">
+                <canvas id="chart-types"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Niveaux de risque environnemental</div>
+            <div class="chart-container">
+                <canvas id="chart-risques"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Sites par région minière</div>
+            <div class="chart-container">
+                <canvas id="chart-regions-sites"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLE CONFLITS -->
+    <div class="grid-1">
+        <div class="card">
+            <div class="card-title">Analyse détaillée des conflits d'usage</div>
+            <div class="table-container">
+                <table id="table-conflits">
+                    <thead>
+                        <tr>
+                            <th>Site minier</th>
+                            <th>Substance</th>
+                            <th>Région</th>
+                            <th>Distance eau</th>
+                            <th>Distance aire protégée</th>
+                            <th>Localités 5km</th>
+                            <th>Score conflit</th>
+                            <th>Risque</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-conflits">
+                        <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLE IMPACT -->
+    <div class="grid-1">
+        <div class="card">
+            <div class="card-title">Impact environnemental et population affectée</div>
+            <div class="table-container">
+                <table id="table-impact">
+                    <thead>
+                        <tr>
+                            <th>Site minier</th>
+                            <th>Substance</th>
+                            <th>Région</th>
+                            <th>Pop. 5km</th>
+                            <th>Pop. 10km</th>
+                            <th>Pop. 20km</th>
+                            <th>Dist. cours d'eau</th>
+                            <th>Indice risque</th>
+                            <th>Niveau</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-impact">
+                        <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLE PREDICTIONS -->
+    <div class="grid-1">
+        <div class="card">
+            <div class="card-title">Potentiel minier par région — Analyse prédictive</div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Région</th>
+                            <th>Score potentiel</th>
+                            <th>Sites actifs</th>
+                            <th>Explorations</th>
+                            <th>Gisements connus</th>
+                            <th>Substances probables</th>
+                            <th>Recommandation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-predictions">
+                        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    <p>SenMine GIS — Système d'Information Géographique Minier du Sénégal</p>
+    <p style="margin-top:6px">Données : USGS National Minerals Information Center (2021) · OpenStreetMap · WorldPop 2020</p>
+    <p style="margin-top:6px">Développé par <strong style="color:var(--gold)">Oumar THIOMBANE</strong> — Fullstack & WebGIS Engineer, Dakar, Sénégal</p>
+</footer>
+
+<script>
+const API = 'http://127.0.0.1:8000/api';
+
+document.getElementById('date-rapport').textContent = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+function fmt(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1) + 'k';
+    return n.toString();
+}
+
+function riskPill(niveau) {
+    const cls = niveau === 'CRITIQUE' ? 'critique' :
+                niveau === 'ÉLEVÉ' ? 'eleve' :
+                niveau === 'MODÉRÉ' ? 'modere' : 'faible';
+    return `<span class="risk-pill pill-${cls}">${niveau}</span>`;
+}
+
+function scoreBar(val, max=100) {
+    return `
+        <div class="score-bar">
+            <div class="score-bar-track">
+                <div class="score-bar-fill" style="width:${(val/max)*100}%"></div>
+            </div>
+            <div class="score-val">${val}</div>
+        </div>
+    `;
+}
+
+async function chargerTout() {
+    const [stats, conflits, predictions, impacts] = await Promise.all([
+        fetch(`${API}/stats/`).then(r => r.json()),
+        fetch(`${API}/conflits-usage/`).then(r => r.json()),
+        fetch(`${API}/predictions/`).then(r => r.json()),
+        fetch(`${API}/impact-environnemental/`).then(r => r.json()),
+    ]);
+
+    // KPIs
+    document.getElementById('kpis').innerHTML = `
+        <div class="kpi">
+            <span class="kpi-icon">⛏</span>
+            <div class="kpi-value gold">${stats.nb_sites_miniers}</div>
+            <div class="kpi-label">Sites d'exploitation</div>
+            <div class="kpi-sub">Mines, carrières & usines</div>
+        </div>
+        <div class="kpi">
+            <span class="kpi-icon">🔍</span>
+            <div class="kpi-value blue">${stats.nb_explorations}</div>
+            <div class="kpi-label">Sites d'exploration</div>
+            <div class="kpi-sub">En cours de prospection</div>
+        </div>
+        <div class="kpi">
+            <span class="kpi-icon">💎</span>
+            <div class="kpi-value orange">${stats.nb_gisements}</div>
+            <div class="kpi-label">Gisements identifiés</div>
+            <div class="kpi-sub">Ressources confirmées</div>
+        </div>
+        <div class="kpi">
+            <span class="kpi-icon">🌿</span>
+            <div class="kpi-value green">${stats.nb_aires_protegees}</div>
+            <div class="kpi-label">Aires protégées</div>
+            <div class="kpi-sub">Zones de conservation</div>
+        </div>
+        <div class="kpi">
+            <span class="kpi-icon">🏘</span>
+            <div class="kpi-value blue">${stats.nb_localites}</div>
+            <div class="kpi-label">Localités</div>
+            <div class="kpi-sub">Villes et villages</div>
+        </div>
+    `;
+
+    // Insights automatiques
+    const siteCritique = conflits.find(c => c.niveau_risque === 'CRITIQUE');
+    const regionTop = predictions[0];
+    const totalPop20 = impacts.reduce((s, i) => s + i.population_20km, 0);
+    const sitesProxEau = conflits.filter(c => c.distance_cours_eau_m < 5000).length;
+
+    document.getElementById('insights').innerHTML = `
+        <div class="insight red">
+            <div class="insight-title">⚠ Site à risque critique</div>
+            <div class="insight-text">${siteCritique ?
+                `<strong>${siteCritique.site_nom}</strong> présente le score de conflit le plus élevé (${siteCritique.score_conflit}/100) — à moins de ${(siteCritique.distance_aire_protegee_m/1000).toFixed(1)}km d'une aire protégée.` :
+                'Aucun site ne présente de risque critique actuellement.'
+            }</div>
+        </div>
+        <div class="insight gold">
+            <div class="insight-title">🎯 Région à plus fort potentiel</div>
+            <div class="insight-text"><strong>${regionTop?.region?.replace('Région de ','') || 'N/A'}</strong> obtient le score de potentiel minier le plus élevé avec <strong>${regionTop?.score_potentiel}/100</strong> — ${regionTop?.facteurs?.nb_sites_actifs} sites actifs, ${regionTop?.facteurs?.nb_explorations} explorations.</div>
+        </div>
+        <div class="insight orange">
+            <div class="insight-title">👥 Population exposée</div>
+            <div class="insight-text"><strong>${fmt(totalPop20)}</strong> personnes vivent dans un rayon de 20km d'au moins un site minier actif au Sénégal.</div>
+        </div>
+        <div class="insight blue">
+            <div class="insight-title">🌊 Proximité aux cours d'eau</div>
+            <div class="insight-text"><strong>${sitesProxEau} sites</strong> sur ${conflits.length} sont localisés à moins de 5km d'un cours d'eau — un risque environnemental majeur pour la qualité de l'eau.</div>
+        </div>
+    `;
+
+    // Graphique substances
+    const substancesCount = {};
+    conflits.forEach(c => {
+        const s = c.substance || 'Autre';
+        substancesCount[s] = (substancesCount[s] || 0) + 1;
+    });
+    const substKeys = Object.keys(substancesCount).slice(0, 8);
+    new Chart(document.getElementById('chart-substances-bar'), {
+        type: 'bar',
+        data: {
+            labels: substKeys,
+            datasets: [{
+                data: substKeys.map(k => substancesCount[k]),
+                backgroundColor: 'rgba(212,168,67,0.3)',
+                borderColor: '#D4A843',
+                borderWidth: 2,
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' } },
+                y: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' } }
+            }
+        }
+    });
+
+    // Graphique potentiel
+    const predsActives = predictions.filter(p => p.score_potentiel > 0);
+    new Chart(document.getElementById('chart-potentiel'), {
+        type: 'bar',
+        data: {
+            labels: predsActives.map(p => p.region.replace('Région de ', '')),
+            datasets: [{
+                data: predsActives.map(p => p.score_potentiel),
+                backgroundColor: predsActives.map(p =>
+                    p.score_potentiel >= 60 ? 'rgba(212,168,67,0.5)' :
+                    p.score_potentiel >= 30 ? 'rgba(249,115,22,0.3)' :
+                    'rgba(107,139,174,0.3)'
+                ),
+                borderColor: predsActives.map(p =>
+                    p.score_potentiel >= 60 ? '#D4A843' :
+                    p.score_potentiel >= 30 ? '#F97316' :
+                    '#6B8BAE'
+                ),
+                borderWidth: 2,
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' } },
+                y: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' }, max: 100 }
+            }
+        }
+    });
+
+    // Graphique types de sites
+    const typesCount = {};
+    conflits.forEach(c => {
+        const t = c.site_type || 'Autre';
+        const short = t.replace('Mineral Processing Plants', 'Usines').replace('Mines and Quarries', 'Mines/Carrières').replace('Oil and Gas Refineries and (or) Petrochemical Complexes', 'Pétrochimie').replace('Brine', 'Saumure');
+        typesCount[short] = (typesCount[short] || 0) + 1;
+    });
+    new Chart(document.getElementById('chart-types'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(typesCount),
+            datasets: [{
+                data: Object.values(typesCount),
+                backgroundColor: ['#D4A843','#B87333','#3B82F6','#F97316','#22C55E'],
+                borderWidth: 0, hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#6B8BAE', font: { size: 9 }, boxWidth: 10, padding: 8 }
+                }
+            }
+        }
+    });
+
+    // Graphique risques
+    const risquesCount = { 'CRITIQUE': 0, 'ÉLEVÉ': 0, 'MODÉRÉ': 0, 'FAIBLE': 0 };
+    impacts.forEach(i => { risquesCount[i.niveau_risque]++; });
+    new Chart(document.getElementById('chart-risques'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(risquesCount),
+            datasets: [{
+                data: Object.values(risquesCount),
+                backgroundColor: ['#EF4444','#F97316','#D4A843','#22C55E'],
+                borderWidth: 0, hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#6B8BAE', font: { size: 9 }, boxWidth: 10, padding: 8 }
+                }
+            }
+        }
+    });
+
+    // Graphique sites par région
+    const regionsCount = {};
+    conflits.forEach(c => {
+        const r = c.region || 'Autre';
+        regionsCount[r] = (regionsCount[r] || 0) + 1;
+    });
+    new Chart(document.getElementById('chart-regions-sites'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(regionsCount),
+            datasets: [{
+                data: Object.values(regionsCount),
+                backgroundColor: 'rgba(59,130,246,0.3)',
+                borderColor: '#3B82F6',
+                borderWidth: 2, borderRadius: 6,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { color: 'rgba(45,62,85,0.3)' } },
+                y: { ticks: { color: '#6B8BAE', font: { size: 9 } }, grid: { display: false } }
+            }
+        }
+    });
+
+    // Table conflits
+    document.getElementById('tbody-conflits').innerHTML = conflits.map(c => `
+        <tr>
+            <td style="font-weight:600">${c.site_nom}</td>
+            <td class="td-muted">${c.substance || 'N/A'}</td>
+            <td class="td-muted">${c.region}</td>
+            <td>${(c.distance_cours_eau_m/1000).toFixed(1)} km</td>
+            <td>${(c.distance_aire_protegee_m/1000).toFixed(1)} km</td>
+            <td>${c.nb_localites_5km}</td>
+            <td>${scoreBar(c.score_conflit)}</td>
+            <td>${riskPill(c.niveau_risque)}</td>
+        </tr>
+    `).join('');
+
+    // Table impact
+    document.getElementById('tbody-impact').innerHTML = impacts.map(i => `
+        <tr>
+            <td style="font-weight:600">${i.site_nom}</td>
+            <td class="td-muted">${i.substance || 'N/A'}</td>
+            <td class="td-muted">${i.region}</td>
+            <td style="color:var(--gold)">${fmt(i.population_5km)}</td>
+            <td>${fmt(i.population_10km)}</td>
+            <td>${fmt(i.population_20km)}</td>
+            <td>${i.distance_cours_eau_km} km</td>
+            <td>${scoreBar(i.indice_risque)}</td>
+            <td>${riskPill(i.niveau_risque)}</td>
+        </tr>
+    `).join('');
+
+    // Table prédictions
+    document.getElementById('tbody-predictions').innerHTML = predictions
+        .filter(p => p.score_potentiel > 0)
+        .map(p => `
+        <tr>
+            <td style="font-weight:600">${p.region.replace('Région de ', '')}</td>
+            <td>${scoreBar(p.score_potentiel)}</td>
+            <td style="text-align:center">${p.facteurs.nb_sites_actifs}</td>
+            <td style="text-align:center">${p.facteurs.nb_explorations}</td>
+            <td style="text-align:center">${p.facteurs.nb_gisements_connus}</td>
+            <td>
+                <div class="substance-list">
+                    ${p.substances_probables.slice(0, 3).map(s =>
+                        `<span class="substance-tag">${s}</span>`
+                    ).join('')}
+                </div>
+            </td>
+            <td style="font-size:11px;color:var(--muted);font-style:italic">${p.recommandation}</td>
+        </tr>
+    `).join('');
+}
+
+chargerTout();
+</script>
+</body>
+</html>
